@@ -1,107 +1,74 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import * as sdk from "microsoft-cognitiveservices-speech-sdk";
 import tmi from "tmi.js";
 
 const Chat = () => {
   const [channel, setChannel] = useState("");
-  // 新增語音設定狀態
-  const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
-  const [voiceRate, setVoiceRate] = useState(1);
-  const [voiceVolume, setVoiceVolume] = useState(1);
-  const [voicePitch, setVoicePitch] = useState(1);
-  const [availableVoices, setAvailableVoices] = useState<
-    SpeechSynthesisVoice[]
-  >([]);
-  const [selectedVoice, setSelectedVoice] = useState<string>("");
-  // 新增語音佇列狀態
-  const [speechQueue, setSpeechQueue] = useState<string[]>([]);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  // 處理語音佇列
-  useEffect(() => {
-    const processQueue = async () => {
-      if (speechQueue.length > 0 && !isSpeaking && isSpeechEnabled) {
-        setIsSpeaking(true);
-        const text = speechQueue[0];
-
-        try {
-          resetSpeechSynthesis(); // 每次播放前重置
-
-          const utterance = new SpeechSynthesisUtterance(text);
-          const voice = availableVoices.find((v) => v.name === selectedVoice);
-          if (voice) utterance.voice = voice;
-
-          utterance.lang = "zh-TW";
-          utterance.rate = voiceRate;
-          utterance.pitch = voicePitch;
-          utterance.volume = voiceVolume;
-
-          // 添加錯誤處理
-          utterance.onerror = (event) => {
-            console.error("語音播放錯誤:", event);
-            setIsSpeaking(false);
-            setSpeechQueue((prev) => prev.slice(1));
-            resetSpeechSynthesis();
-          };
-
-          // 添加完成處理
-          utterance.onend = () => {
-            setIsSpeaking(false);
-            setSpeechQueue((prev) => prev.slice(1));
-          };
-
-          window.speechSynthesis.speak(utterance);
-        } catch (error) {
-          console.error("語音處理錯誤:", error);
-          setIsSpeaking(false);
-          setSpeechQueue((prev) => prev.slice(1));
-          resetSpeechSynthesis();
-        }
-      }
-    };
-
-    processQueue();
-  }, [
-    speechQueue,
-    isSpeaking,
-    isSpeechEnabled,
-    selectedVoice,
-    voiceRate,
-    voicePitch,
-    voiceVolume,
-    availableVoices,
-  ]);
-
-  // 修改原本的 speak 函數
-  const addToSpeechQueue = (text: string) => {
-    if (!isSpeechEnabled) return;
-    setSpeechQueue((prev) => [...prev, text]);
-  };
-
-  const speak = (text: string) => {
-    if (!isSpeechEnabled || !window.speechSynthesis) return;
-
-    // 取消所有正在播放的語音
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    // 設定選擇的語音
-    const voice = availableVoices.find((v) => v.name === selectedVoice);
-    if (voice) utterance.voice = voice;
-
-    utterance.lang = "zh-TW";
-    utterance.rate = voiceRate;
-    utterance.pitch = voicePitch;
-    utterance.volume = voiceVolume;
-    // 添加語音播放的事件監聽，用於除錯
-    utterance.onstart = () => console.log("開始播放語音");
-    utterance.onend = () => console.log("語音播放結束");
-    utterance.onerror = (event) => console.error("語音播放錯誤:", event);
-
-    window.speechSynthesis.speak(utterance);
-  };
-
   const [isConnected, setIsConnected] = useState(false);
   const [client, setClient] = useState<tmi.Client | null>(null);
+  const [messages, setMessages] = useState<JSX.Element[]>([]);
+
+  // 新增語音設定狀態
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
+  const [speechRate, setSpeechRate] = useState(1);
+  const [speechVolume, setSpeechVolume] = useState(1);
+  const [speechPitch, setSpeechPitch] = useState(1);
+  const [selectedVoice, setSelectedVoice] = useState("zh-TW-YunJheNeural");
+
+  // 需要添加 speechConfig 的初始化
+  const speechConfig = useMemo(() => {
+    const key = process.env.NEXT_PUBLIC_AZURE_SPEECH_KEY;
+    const region = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION;
+
+    if (!key || !region) {
+      console.error("Azure Speech 設定缺失");
+      return null;
+    }
+
+    try {
+      const config = sdk.SpeechConfig.fromSubscription(key, region);
+      config.speechSynthesisVoiceName = selectedVoice;
+      return config;
+    } catch (error) {
+      console.error("Azure Speech 初始化錯誤:", error);
+      return null;
+    }
+  }, [selectedVoice]);
+
+  const speak = async (text: string) => {
+    if (!isSpeechEnabled || !speechConfig) return;
+
+    try {
+      const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
+      const ssml = `
+      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
+        <voice name="${selectedVoice}">
+          <prosody rate="${speechRate}" 
+                   volume="${Math.round(speechVolume * 100)}%">
+            ${text}
+          </prosody>
+        </voice>
+      </speak>
+    `;
+
+      synthesizer.speakSsmlAsync(
+        ssml,
+        (result) => {
+          synthesizer.close();
+          if (result) {
+            console.log("語音播放完成");
+          }
+        },
+        (error) => {
+          console.error("語音合成錯誤:", error);
+          synthesizer.close();
+        }
+      );
+    } catch (error) {
+      console.error("語音初始化錯誤:", error);
+    }
+  };
+
   const connectToChat = (channelName: string) => {
     if (isConnected || !channelName.trim()) return;
 
@@ -115,23 +82,29 @@ const Chat = () => {
         .then(() => {
           setIsConnected(true);
           setClient(newClient);
-          addToSpeechQueue("聊天室已連結完成");
-
+          speak("聊天室已連結完成");
           newClient.on("message", (channel, tags, message, self) => {
             // 過濾系統機器人
             const systemBots = ["Nightbot", "StreamElements"];
-            if (systemBots.includes(tags.username || "")) {
+            const username = tags.username?.toLowerCase() || "";
+
+            // 檢查是否為機器人
+            if (
+              systemBots.some((bot) => username.includes(bot.toLowerCase()))
+            ) {
+              console.log("過濾機器人訊息:", username);
               return;
             }
             const displayName = tags["display-name"] || tags.username;
             const userColor = tags.color || "#8A2BE2"; // 預設紫色
             // 處理訊息內容
-            let processedMessage = message;
             let speechMessage = message;
+            if (message.includes("https://") || message.includes("http://")) {
+              speechMessage = "連結懶得念";
+            }
 
             // 檢查是否包含網址
             if (message.includes("https://") || message.includes("http://")) {
-              processedMessage = message; // 顯示原始訊息
               speechMessage = "連結懶得念"; // 語音播報用的文字
             }
 
@@ -140,14 +113,14 @@ const Chat = () => {
                 <span style={{ color: userColor }} className=" font-black">
                   {displayName}
                 </span>
-                <span>: {processedMessage}</span>
+                <span>: {message}</span>
               </div>
             );
             setMessages((prev) => [...prev, messageComponent]);
 
             // 將訊息加入語音佇列
             if (isSpeechEnabled) {
-              addToSpeechQueue(speechMessage);
+              speak(speechMessage);
             }
           });
         })
@@ -159,95 +132,58 @@ const Chat = () => {
       console.error("建立連接時發生錯誤:", err);
     }
   };
-  const [messages, setMessages] = useState<JSX.Element[]>([]);
-  // 新增清空佇列的功能
-  const clearSpeechQueue = () => {
-    window.speechSynthesis.cancel();
-    setSpeechQueue([]);
-    setIsSpeaking(false);
-  };
-
-  // 在斷開連接時清空佇列
+  // 斷開連接
   const disconnectFromChat = () => {
     if (client) {
       client.disconnect();
       setClient(null);
       setIsConnected(false);
       setMessages([]);
-      clearSpeechQueue();
+      speak("已斷開連接");
     }
   };
-
-  // 初始化語音系統
+  // 除錯用
   useEffect(() => {
-    let retryCount = 0;
-    const maxRetries = 5;
+    console.log("Azure Key:", process.env.NEXT_PUBLIC_AZURE_SPEECH_KEY);
+    console.log("Azure Region:", process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION);
+  }, []);
 
-    const initVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length === 0 && retryCount < maxRetries) {
-        retryCount++;
-        setTimeout(initVoices, 500); // 延遲 500ms 後重試
-        return;
-      }
+  // 在組件頂部添加狀態來存儲可用的語音
+  const [availableVoices, setAvailableVoices] = useState<
+    { name: string; displayName: string }[]
+  >([]);
 
-      const chineseVoices = voices.filter(
-        (voice) => voice.lang.includes("zh") || voice.lang.includes("cmn")
+  // 添加一個函數來獲取可用的語音列表
+  const listAvailableVoices = async () => {
+    if (!speechConfig) return;
+
+    try {
+      const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
+      const result = await synthesizer.getVoicesAsync();
+
+      // 過濾出中文語音
+      const chineseVoices = result.voices.filter(
+        (voice) => voice.locale.includes("zh-") || voice.locale.includes("cmn-")
       );
 
-      if (chineseVoices.length > 0) {
-        setAvailableVoices(chineseVoices);
-        const defaultVoice = chineseVoices.find(
-          (voice) =>
-            voice.name.includes("Google") && voice.name.includes("臺灣")
-        );
-        if (defaultVoice) {
-          setSelectedVoice(defaultVoice.name);
-          setTimeout(() => {
-            addToSpeechQueue("語音系統已初始化");
-          }, 100);
-        }
-      } else {
-        console.error("找不到可用的中文語音");
-      }
-    };
+      console.log("所有可用的中文語音：", chineseVoices);
 
-    if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = initVoices;
-      initVoices();
-    }
-  }, []);
+      const voiceList = chineseVoices.map((voice) => ({
+        name: voice.name,
+        displayName: voice.localName,
+      }));
 
-  // 添加重置機制
-  const resetSpeechSynthesis = () => {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel(); // 取消所有語音
-      window.speechSynthesis.resume(); // 重新啟動語音系統
+      setAvailableVoices(voiceList);
+      synthesizer.close();
+    } catch (error) {
+      console.error("獲取語音列表失敗:", error);
     }
   };
 
-  // 定期重置語音系統
+  // 在組件載入時獲取語音列表
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      resetSpeechSynthesis();
-    }, 10000); // 每 10 秒重置一次
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        resetSpeechSynthesis();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
+    listAvailableVoices();
+  }, [speechConfig]);
 
   return (
     <div className="p-4">
@@ -284,7 +220,7 @@ const Chat = () => {
         </div>
 
         {/* 語音控制面板 */}
-        <div className="p-4 bg-gray-100 rounded-lg w-full">
+        <div className="p-4 bg-gray-100 rounded-lg mb-4">
           <div className="flex items-center gap-4 mb-4">
             <button
               onClick={() => setIsSpeechEnabled(!isSpeechEnabled)}
@@ -297,7 +233,6 @@ const Chat = () => {
               語音播報 {isSpeechEnabled ? "開啟" : "關閉"}
             </button>
 
-            {/* 語音選擇 */}
             <select
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
@@ -305,49 +240,48 @@ const Chat = () => {
             >
               {availableVoices.map((voice) => (
                 <option key={voice.name} value={voice.name}>
-                  {voice.name}
+                  {voice.displayName}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* 語音設定滑桿 */}
           <div className="space-y-2">
             <div>
-              <label className="block text-sm">語速 ({voiceRate})</label>
+              <label className="block text-sm">語速 ({speechRate})</label>
               <input
                 type="range"
                 min="0.5"
                 max="2"
                 step="0.1"
-                value={voiceRate}
-                onChange={(e) => setVoiceRate(Number(e.target.value))}
+                value={speechRate}
+                onChange={(e) => setSpeechRate(Number(e.target.value))}
                 className="w-full"
               />
             </div>
             <div>
               <label className="block text-sm">
-                音量 ({Math.round(voiceVolume * 100)}%)
+                音量 ({Math.round(speechVolume * 100)}%)
               </label>
               <input
                 type="range"
                 min="0"
                 max="1"
                 step="0.1"
-                value={voiceVolume}
-                onChange={(e) => setVoiceVolume(Number(e.target.value))}
+                value={speechVolume}
+                onChange={(e) => setSpeechVolume(Number(e.target.value))}
                 className="w-full"
               />
             </div>
             <div>
-              <label className="block text-sm">音調 ({voicePitch})</label>
+              <label className="block text-sm">音調 ({speechPitch})</label>
               <input
                 type="range"
                 min="0.5"
                 max="2"
                 step="0.1"
-                value={voicePitch}
-                onChange={(e) => setVoicePitch(Number(e.target.value))}
+                value={speechPitch}
+                onChange={(e) => setSpeechPitch(Number(e.target.value))}
                 className="w-full"
               />
             </div>
