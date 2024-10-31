@@ -23,28 +23,39 @@ const Chat = () => {
         setIsSpeaking(true);
         const text = speechQueue[0];
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voice = availableVoices.find((v) => v.name === selectedVoice);
-        if (voice) utterance.voice = voice;
+        try {
+          resetSpeechSynthesis(); // 每次播放前重置
 
-        utterance.lang = "zh-TW";
-        utterance.rate = voiceRate;
-        utterance.pitch = voicePitch;
-        utterance.volume = voiceVolume;
+          const utterance = new SpeechSynthesisUtterance(text);
+          const voice = availableVoices.find((v) => v.name === selectedVoice);
+          if (voice) utterance.voice = voice;
 
-        // 語音結束後處理下一個
-        utterance.onend = () => {
-          setSpeechQueue((prev) => prev.slice(1));
+          utterance.lang = "zh-TW";
+          utterance.rate = voiceRate;
+          utterance.pitch = voicePitch;
+          utterance.volume = voiceVolume;
+
+          // 添加錯誤處理
+          utterance.onerror = (event) => {
+            console.error("語音播放錯誤:", event);
+            setIsSpeaking(false);
+            setSpeechQueue((prev) => prev.slice(1));
+            resetSpeechSynthesis();
+          };
+
+          // 添加完成處理
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            setSpeechQueue((prev) => prev.slice(1));
+          };
+
+          window.speechSynthesis.speak(utterance);
+        } catch (error) {
+          console.error("語音處理錯誤:", error);
           setIsSpeaking(false);
-        };
-
-        utterance.onerror = (event) => {
-          console.error("語音播放錯誤:", event);
           setSpeechQueue((prev) => prev.slice(1));
-          setIsSpeaking(false);
-        };
-
-        window.speechSynthesis.speak(utterance);
+          resetSpeechSynthesis();
+        }
       }
     };
 
@@ -169,36 +180,73 @@ const Chat = () => {
 
   // 初始化語音系統
   useEffect(() => {
-    // 確保語音系統已載入
+    let retryCount = 0;
+    const maxRetries = 5;
+
     const initVoices = () => {
       const voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0 && retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(initVoices, 500); // 延遲 500ms 後重試
+        return;
+      }
+
       const chineseVoices = voices.filter(
         (voice) => voice.lang.includes("zh") || voice.lang.includes("cmn")
       );
-      console.log("可用的中文語音：", chineseVoices); // 用於除錯
-      setAvailableVoices(chineseVoices);
-      const defaultVoice = chineseVoices.find(
-        (voice) => voice.name.includes("Google") && voice.name.includes("臺灣")
-      );
-      if (defaultVoice) {
-        setSelectedVoice(defaultVoice.name);
-        setTimeout(() => {
-          addToSpeechQueue("語音系統已初始化");
-        }, 100);
-      } else if (chineseVoices.length > 0) {
-        // 如果找不到指定語音，則使用第一個可用的中文語音
-        setSelectedVoice(chineseVoices[0].name);
-        setTimeout(() => {
-          addToSpeechQueue("語音系統已初始化");
-        }, 100);
+
+      if (chineseVoices.length > 0) {
+        setAvailableVoices(chineseVoices);
+        const defaultVoice = chineseVoices.find(
+          (voice) =>
+            voice.name.includes("Google") && voice.name.includes("臺灣")
+        );
+        if (defaultVoice) {
+          setSelectedVoice(defaultVoice.name);
+          setTimeout(() => {
+            addToSpeechQueue("語音系統已初始化");
+          }, 100);
+        }
+      } else {
+        console.error("找不到可用的中文語音");
       }
     };
 
     if (window.speechSynthesis) {
-      // Chrome需要這個事件
       window.speechSynthesis.onvoiceschanged = initVoices;
       initVoices();
     }
+  }, []);
+
+  // 添加重置機制
+  const resetSpeechSynthesis = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel(); // 取消所有語音
+      window.speechSynthesis.resume(); // 重新啟動語音系統
+    }
+  };
+
+  // 定期重置語音系統
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      resetSpeechSynthesis();
+    }, 10000); // 每 10 秒重置一次
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        resetSpeechSynthesis();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   return (
