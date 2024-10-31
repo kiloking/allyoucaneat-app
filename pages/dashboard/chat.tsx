@@ -85,7 +85,12 @@ const Chat = () => {
           speak("聊天室已連結完成");
           newClient.on("message", (channel, tags, message, self) => {
             // 過濾系統機器人
-            const systemBots = ["Nightbot", "StreamElements"];
+            const systemBots = [
+              "Nightbot",
+              "StreamElements",
+              "Moobot",
+              "Streamlabs",
+            ];
             const username = tags.username?.toLowerCase() || "";
 
             // 檢查是否為機器人
