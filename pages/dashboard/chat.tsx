@@ -13,60 +13,141 @@ const Chat = () => {
   const [speechRate, setSpeechRate] = useState(1);
   const [speechVolume, setSpeechVolume] = useState(1);
   const [speechPitch, setSpeechPitch] = useState(1);
-  const [selectedVoice, setSelectedVoice] = useState("zh-TW-YunJheNeural");
+  const [selectedVoice, setSelectedVoice] = useState("zh-CN-YunxiNeural");
+
+  const [azureConfig, setAzureConfig] = useState<{
+    key: string;
+    region: string;
+  } | null>(null);
+
+  // 獲取 Azure 設定
+  const fetchAzureConfig = async () => {
+    try {
+      const response = await fetch("/api/speech-token", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_AUTH_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("取得語音設定失敗");
+      }
+
+      const config = await response.json();
+      setAzureConfig(config);
+    } catch (error) {
+      console.error("取得語音設定錯誤:", error);
+    }
+  };
+
+  // 在組件載入時獲取設定
+  useEffect(() => {
+    fetchAzureConfig();
+  }, []);
 
   // 需要添加 speechConfig 的初始化
   const speechConfig = useMemo(() => {
-    const key = process.env.NEXT_PUBLIC_AZURE_SPEECH_KEY;
-    const region = process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION;
-
-    if (!key || !region) {
-      console.error("Azure Speech 設定缺失");
-      return null;
-    }
+    if (!azureConfig) return null;
 
     try {
-      const config = sdk.SpeechConfig.fromSubscription(key, region);
+      const config = sdk.SpeechConfig.fromSubscription(
+        azureConfig.key,
+        azureConfig.region
+      );
       config.speechSynthesisVoiceName = selectedVoice;
       return config;
     } catch (error) {
       console.error("Azure Speech 初始化錯誤:", error);
       return null;
     }
-  }, [selectedVoice]);
+  }, [azureConfig, selectedVoice]);
 
-  const speak = async (text: string) => {
-    if (!isSpeechEnabled || !speechConfig) return;
+  // 添加語音佇列狀態
+  const [speechQueue, setSpeechQueue] = useState<string[]>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const currentSynthesizer = useRef<sdk.SpeechSynthesizer | null>(null);
 
-    try {
-      const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-      const ssml = `
-      <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
-        <voice name="${selectedVoice}">
-          <prosody rate="${speechRate}" 
-                   volume="${Math.round(speechVolume * 100)}%">
-            ${text}
-          </prosody>
-        </voice>
-      </speak>
-    `;
+  // 處理語音佇列
+  useEffect(() => {
+    const processQueue = async () => {
+      if (speechQueue.length > 0 && !isSpeaking && speechConfig) {
+        setIsSpeaking(true);
+        const text = speechQueue[0];
 
-      synthesizer.speakSsmlAsync(
-        ssml,
-        (result) => {
-          synthesizer.close();
-          if (result) {
-            console.log("語音播放完成");
+        try {
+          // 如果有正在播放的語音，先停止
+          if (currentSynthesizer.current) {
+            currentSynthesizer.current.close();
           }
-        },
-        (error) => {
-          console.error("語音合成錯誤:", error);
-          synthesizer.close();
+
+          const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
+          currentSynthesizer.current = synthesizer;
+
+          const ssml = `
+              <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
+                <voice name="${selectedVoice}">
+                  <prosody rate="${speechRate}" 
+                           pitch="${speechPitch}%" 
+                           volume="${Math.round(speechVolume * 100)}%">
+                    ${text}
+                  </prosody>
+                </voice>
+              </speak>
+            `;
+
+          await new Promise((resolve, reject) => {
+            synthesizer.speakSsmlAsync(
+              ssml,
+              (result) => {
+                synthesizer.close();
+                currentSynthesizer.current = null;
+                resolve(result);
+              },
+              (error) => {
+                console.error("語音合成錯誤:", error);
+                synthesizer.close();
+                currentSynthesizer.current = null;
+                reject(error);
+              }
+            );
+          });
+
+          // 移除已播放的文字
+          setSpeechQueue((prev) => prev.slice(1));
+        } catch (error) {
+          console.error("語音播放錯誤:", error);
+        } finally {
+          setIsSpeaking(false);
         }
-      );
-    } catch (error) {
-      console.error("語音初始化錯誤:", error);
+      }
+    };
+
+    processQueue();
+  }, [
+    speechQueue,
+    isSpeaking,
+    speechConfig,
+    selectedVoice,
+    speechRate,
+    speechPitch,
+    speechVolume,
+  ]);
+
+  // 修改 speak 函數
+  const speak = (text: string) => {
+    if (!isSpeechEnabled) return;
+    setSpeechQueue((prev) => [...prev, text]);
+  };
+  // 添加清除佇列的函數
+  const clearSpeechQueue = () => {
+    if (currentSynthesizer.current) {
+      currentSynthesizer.current.close();
+      currentSynthesizer.current = null;
     }
+    setSpeechQueue([]);
+    setIsSpeaking(false);
   };
 
   const connectToChat = (channelName: string) => {
@@ -144,7 +225,8 @@ const Chat = () => {
       setClient(null);
       setIsConnected(false);
       setMessages([]);
-      speak("已斷開連接");
+      clearSpeechQueue(); // 清除所有待播放的語音
+      speak("已斷開連接"); // 加入最後的提示音
     }
   };
   // 除錯用
