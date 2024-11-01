@@ -70,57 +70,63 @@ const Chat = () => {
   const currentSynthesizer = useRef<sdk.SpeechSynthesizer | null>(null);
 
   // 處理語音佇列
+  // 處理語音佇列
   useEffect(() => {
     const processQueue = async () => {
-      if (speechQueue.length > 0 && !isSpeaking && speechConfig) {
+      // 如果正在說話或佇列為空，直接返回
+      if (isSpeaking || speechQueue.length === 0 || !speechConfig) return;
+
+      try {
         setIsSpeaking(true);
         const text = speechQueue[0];
 
-        try {
-          // 如果有正在播放的語音，先停止
-          if (currentSynthesizer.current) {
-            currentSynthesizer.current.close();
-          }
-
-          const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-          currentSynthesizer.current = synthesizer;
-
-          const ssml = `
-              <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
-                <voice name="${selectedVoice}">
-                  <prosody rate="${speechRate}" 
-                           pitch="${speechPitch}%" 
-                           volume="${Math.round(speechVolume * 100)}%">
-                    ${text}
-                  </prosody>
-                </voice>
-              </speak>
-            `;
-
-          await new Promise((resolve, reject) => {
-            synthesizer.speakSsmlAsync(
-              ssml,
-              (result) => {
-                synthesizer.close();
-                currentSynthesizer.current = null;
-                resolve(result);
-              },
-              (error) => {
-                console.error("語音合成錯誤:", error);
-                synthesizer.close();
-                currentSynthesizer.current = null;
-                reject(error);
-              }
-            );
-          });
-
-          // 移除已播放的文字
-          setSpeechQueue((prev) => prev.slice(1));
-        } catch (error) {
-          console.error("語音播放錯誤:", error);
-        } finally {
-          setIsSpeaking(false);
+        // 確保先關閉之前的合成器
+        if (currentSynthesizer.current) {
+          currentSynthesizer.current.close();
+          currentSynthesizer.current = null;
         }
+
+        const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
+        currentSynthesizer.current = synthesizer;
+
+        const ssml = `
+        <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
+          <voice name="${selectedVoice}">
+            <prosody rate="${speechRate}" 
+                     pitch="${speechPitch}%" 
+                     volume="${Math.round(speechVolume * 100)}%">
+              ${text}
+            </prosody>
+          </voice>
+        </speak>
+      `;
+
+        // 使用 Promise 確保語音播放完成
+        await new Promise((resolve, reject) => {
+          synthesizer.speakSsmlAsync(
+            ssml,
+            (result) => {
+              synthesizer.close();
+              currentSynthesizer.current = null;
+              resolve(result);
+            },
+            (error) => {
+              console.error("語音合成錯誤:", error);
+              synthesizer.close();
+              currentSynthesizer.current = null;
+              reject(error);
+            }
+          );
+        });
+
+        // 成功播放後才移除佇列中的項目
+        setSpeechQueue((prev) => prev.slice(1));
+      } catch (error) {
+        console.error("語音播放錯誤:", error);
+        // 發生錯誤時也要移除，避免卡住
+        setSpeechQueue((prev) => prev.slice(1));
+      } finally {
+        setIsSpeaking(false);
       }
     };
 
@@ -138,7 +144,13 @@ const Chat = () => {
   // 修改 speak 函數
   const speak = (text: string) => {
     if (!isSpeechEnabled) return;
-    setSpeechQueue((prev) => [...prev, text]);
+
+    // 過濾空白訊息
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    // 將新訊息加入佇列
+    setSpeechQueue((prev) => [...prev, trimmedText]);
   };
   // 添加清除佇列的函數
   const clearSpeechQueue = () => {
@@ -149,6 +161,14 @@ const Chat = () => {
     setSpeechQueue([]);
     setIsSpeaking(false);
   };
+  useEffect(() => {
+    return () => {
+      if (currentSynthesizer.current) {
+        currentSynthesizer.current.close();
+      }
+      clearSpeechQueue();
+    };
+  }, []);
 
   const connectToChat = (channelName: string) => {
     if (isConnected || !channelName.trim()) return;
