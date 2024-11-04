@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import * as sdk from "microsoft-cognitiveservices-speech-sdk";
+import React, { useState, useEffect, useRef } from "react";
 import tmi from "tmi.js";
 
 const Chat = () => {
@@ -8,125 +7,90 @@ const Chat = () => {
   const [client, setClient] = useState<tmi.Client | null>(null);
   const [messages, setMessages] = useState<JSX.Element[]>([]);
 
-  // 新增語音設定狀態
+  // 語音設定狀態
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
   const [speechRate, setSpeechRate] = useState(1);
   const [speechVolume, setSpeechVolume] = useState(1);
   const [speechPitch, setSpeechPitch] = useState(1);
-  const [selectedVoice, setSelectedVoice] = useState("zh-CN-YunxiNeural");
+  const [selectedVoice, setSelectedVoice] = useState("");
+  const [availableVoices, setAvailableVoices] = useState<
+    SpeechSynthesisVoice[]
+  >([]);
 
-  const [azureConfig, setAzureConfig] = useState<{
-    key: string;
-    region: string;
-  } | null>(null);
-
-  // 獲取 Azure 設定
-  const fetchAzureConfig = async () => {
-    try {
-      const response = await fetch("/api/speech-token", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_AUTH_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("取得語音設定失敗");
-      }
-
-      const config = await response.json();
-      setAzureConfig(config);
-    } catch (error) {
-      console.error("取得語音設定錯誤:", error);
-    }
-  };
-
-  // 在組件載入時獲取設定
-  useEffect(() => {
-    fetchAzureConfig();
-  }, []);
-
-  // 需要添加 speechConfig 的初始化
-  const speechConfig = useMemo(() => {
-    if (!azureConfig) return null;
-
-    try {
-      const config = sdk.SpeechConfig.fromSubscription(
-        azureConfig.key,
-        azureConfig.region
-      );
-      config.speechSynthesisVoiceName = selectedVoice;
-      return config;
-    } catch (error) {
-      console.error("Azure Speech 初始化錯誤:", error);
-      return null;
-    }
-  }, [azureConfig, selectedVoice]);
-
-  // 添加語音佇列狀態
+  // 語音佇列
   const [speechQueue, setSpeechQueue] = useState<string[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const currentSynthesizer = useRef<sdk.SpeechSynthesizer | null>(null);
+  const currentUtterance = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // 處理語音佇列
+  // 載入可用的語音
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const chineseVoices = voices.filter(
+        (voice) => voice.lang.includes("zh") || voice.lang.includes("cmn")
+      );
+      setAvailableVoices(chineseVoices);
+
+      // 設定預設語音
+      if (chineseVoices.length > 0 && !selectedVoice) {
+        setSelectedVoice(chineseVoices[0].name);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   // 處理語音佇列
   useEffect(() => {
     const processQueue = async () => {
-      // 如果正在說話或佇列為空，直接返回
-      if (isSpeaking || speechQueue.length === 0 || !speechConfig) return;
+      if (isSpeaking || speechQueue.length === 0) return;
 
       try {
         setIsSpeaking(true);
         const text = speechQueue[0];
 
-        // 確保先關閉之前的合成器
-        if (currentSynthesizer.current) {
-          currentSynthesizer.current.close();
-          currentSynthesizer.current = null;
+        // 取消當前播放的語音
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
         }
 
-        const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-        currentSynthesizer.current = synthesizer;
+        const utterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.current = utterance;
 
-        const ssml = `
-        <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-TW">
-          <voice name="${selectedVoice}">
-            <prosody rate="${speechRate}" 
-                     pitch="${speechPitch}%" 
-                     volume="${Math.round(speechVolume * 100)}%">
-              ${text}
-            </prosody>
-          </voice>
-        </speak>
-      `;
+        // 設定語音參數
+        utterance.voice =
+          availableVoices.find((voice) => voice.name === selectedVoice) || null;
+        utterance.rate = speechRate;
+        utterance.volume = speechVolume;
+        utterance.pitch = speechPitch;
+        utterance.lang = "zh-TW";
 
-        // 使用 Promise 確保語音播放完成
-        await new Promise((resolve, reject) => {
-          synthesizer.speakSsmlAsync(
-            ssml,
-            (result) => {
-              synthesizer.close();
-              currentSynthesizer.current = null;
-              resolve(result);
-            },
-            (error) => {
-              console.error("語音合成錯誤:", error);
-              synthesizer.close();
-              currentSynthesizer.current = null;
-              reject(error);
-            }
-          );
-        });
+        // 處理語音結束事件
+        utterance.onend = () => {
+          setIsSpeaking(false);
+          setSpeechQueue((prev) => prev.slice(1));
+          currentUtterance.current = null;
+        };
 
-        // 成功播放後才移除佇列中的項目
-        setSpeechQueue((prev) => prev.slice(1));
+        // 處理語音錯誤
+        utterance.onerror = (event) => {
+          console.error("語音播放錯誤:", event);
+          setIsSpeaking(false);
+          setSpeechQueue((prev) => prev.slice(1));
+          currentUtterance.current = null;
+        };
+
+        // 開始播放
+        window.speechSynthesis.speak(utterance);
       } catch (error) {
-        console.error("語音播放錯誤:", error);
-        // 發生錯誤時也要移除，避免卡住
-        setSpeechQueue((prev) => prev.slice(1));
-      } finally {
+        console.error("語音處理錯誤:", error);
         setIsSpeaking(false);
+        setSpeechQueue((prev) => prev.slice(1));
       }
     };
 
@@ -134,42 +98,34 @@ const Chat = () => {
   }, [
     speechQueue,
     isSpeaking,
-    speechConfig,
     selectedVoice,
     speechRate,
-    speechPitch,
     speechVolume,
+    speechPitch,
+    availableVoices,
   ]);
 
-  // 修改 speak 函數
+  // 語音播放函數
   const speak = (text: string) => {
     if (!isSpeechEnabled) return;
 
-    // 過濾空白訊息
     const trimmedText = text.trim();
     if (!trimmedText) return;
 
-    // 將新訊息加入佇列
     setSpeechQueue((prev) => [...prev, trimmedText]);
   };
-  // 添加清除佇列的函數
+
+  // 清除語音佇列
   const clearSpeechQueue = () => {
-    if (currentSynthesizer.current) {
-      currentSynthesizer.current.close();
-      currentSynthesizer.current = null;
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
     }
     setSpeechQueue([]);
     setIsSpeaking(false);
+    currentUtterance.current = null;
   };
-  useEffect(() => {
-    return () => {
-      if (currentSynthesizer.current) {
-        currentSynthesizer.current.close();
-      }
-      clearSpeechQueue();
-    };
-  }, []);
 
+  // 連接到聊天室
   const connectToChat = (channelName: string) => {
     if (isConnected || !channelName.trim()) return;
 
@@ -184,8 +140,8 @@ const Chat = () => {
           setIsConnected(true);
           setClient(newClient);
           speak("聊天室已連結完成");
+
           newClient.on("message", (channel, tags, message, self) => {
-            // 過濾系統機器人
             const systemBots = [
               "Nightbot",
               "StreamElements",
@@ -194,40 +150,33 @@ const Chat = () => {
             ];
             const username = tags.username?.toLowerCase() || "";
 
-            // 檢查是否為機器人
             if (
               systemBots.some((bot) => username.includes(bot.toLowerCase()))
             ) {
-              console.log("過濾機器人訊息:", username);
               return;
             }
+
             const displayName = tags["display-name"] || tags.username;
-            const userColor = tags.color || "#8A2BE2"; // 預設紫色
-            // 處理訊息內容
+            const userColor = tags.color || "#8A2BE2";
+
+            // 處理語音訊息 - 只念出聊天內容
             let speechMessage = message;
             if (message.includes("https://") || message.includes("http://")) {
               speechMessage = "連結懶得念";
             }
 
-            // 檢查是否包含網址
-            if (message.includes("https://") || message.includes("http://")) {
-              speechMessage = "連結懶得念"; // 語音播報用的文字
-            }
-
             const messageComponent = (
               <div className="mb-2 animate-fade-in-up text-[28px]">
-                <span style={{ color: userColor }} className=" font-black">
+                <span style={{ color: userColor }} className="font-black">
                   {displayName}
                 </span>
                 <span>: {message}</span>
               </div>
             );
-            setMessages((prev) => [...prev, messageComponent]);
 
-            // 將訊息加入語音佇列
-            if (isSpeechEnabled) {
-              speak(speechMessage);
-            }
+            setMessages((prev) => [...prev, messageComponent]);
+            // 只念出聊天內容
+            speak(speechMessage);
           });
         })
         .catch((err) => {
@@ -238,6 +187,7 @@ const Chat = () => {
       console.error("建立連接時發生錯誤:", err);
     }
   };
+
   // 斷開連接
   const disconnectFromChat = () => {
     if (client) {
@@ -245,71 +195,38 @@ const Chat = () => {
       setClient(null);
       setIsConnected(false);
       setMessages([]);
-      clearSpeechQueue(); // 清除所有待播放的語音
-      speak("已斷開連接"); // 加入最後的提示音
+      clearSpeechQueue();
+      speak("已斷開連接");
     }
   };
-  // 除錯用
+
+  // 組件卸載時清理
   useEffect(() => {
-    console.log("Azure Key:", process.env.NEXT_PUBLIC_AZURE_SPEECH_KEY);
-    console.log("Azure Region:", process.env.NEXT_PUBLIC_AZURE_SPEECH_REGION);
+    return () => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+      clearSpeechQueue();
+    };
   }, []);
-
-  // 在組件頂部添加狀態來存儲可用的語音
-  const [availableVoices, setAvailableVoices] = useState<
-    { name: string; displayName: string }[]
-  >([]);
-
-  // 添加一個函數來獲取可用的語音列表
-  const listAvailableVoices = async () => {
-    if (!speechConfig) return;
-
-    try {
-      const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-      const result = await synthesizer.getVoicesAsync();
-
-      // 過濾出中文語音
-      const chineseVoices = result.voices.filter(
-        (voice) => voice.locale.includes("zh-") || voice.locale.includes("cmn-")
-      );
-
-      console.log("所有可用的中文語音：", chineseVoices);
-
-      const voiceList = chineseVoices.map((voice) => ({
-        name: voice.name,
-        displayName: voice.localName,
-      }));
-
-      setAvailableVoices(voiceList);
-      synthesizer.close();
-    } catch (error) {
-      console.error("獲取語音列表失敗:", error);
-    }
-  };
-
-  // 在組件載入時獲取語音列表
-  useEffect(() => {
-    listAvailableVoices();
-  }, [speechConfig]);
 
   return (
     <div className="p-4">
       <div className="mb-4 flex items-start w-full justify-between gap-2">
-        {/* 原有的輸入和連接按鈕 */}
-        <div className=" flex gap-2 items-center p-4 bg-gray-100 rounded-lg w-full">
+        <div className="flex gap-2 items-center p-4 bg-gray-100 rounded-lg w-1/2">
           <input
             type="text"
             value={channel}
             onChange={(e) => setChannel(e.target.value)}
             placeholder="輸入 Twitch 頻道名稱"
             className="border p-2 rounded text-xl"
-            disabled={isConnected} // 連接時禁用輸入
+            disabled={isConnected}
           />
           {!isConnected ? (
             <button
               onClick={() => connectToChat(channel)}
               className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition-colors"
-              disabled={!channel.trim()} // 沒有輸入時禁用按鈕
+              disabled={!channel.trim()}
             >
               連接聊天室
             </button>
@@ -326,8 +243,7 @@ const Chat = () => {
           )}
         </div>
 
-        {/* 語音控制面板 */}
-        <div className="p-4 bg-gray-100 rounded-lg mb-4">
+        <div className="p-4 bg-gray-100 rounded-lg mb-4 w-1/2">
           <div className="flex items-center gap-4 mb-4">
             <button
               onClick={() => setIsSpeechEnabled(!isSpeechEnabled)}
@@ -340,17 +256,49 @@ const Chat = () => {
               語音播報 {isSpeechEnabled ? "開啟" : "關閉"}
             </button>
 
-            <select
-              value={selectedVoice}
-              onChange={(e) => setSelectedVoice(e.target.value)}
-              className="border p-2 rounded"
+            <button
+              onClick={() =>
+                speak("這是一段測試語音，用來確認語音設定是否正確")
+              }
+              className="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              disabled={!isSpeechEnabled}
             >
-              {availableVoices.map((voice) => (
-                <option key={voice.name} value={voice.name}>
-                  {voice.displayName}
-                </option>
-              ))}
-            </select>
+              測試語音
+            </button>
+
+            <div className="flex flex-col gap-2">
+              <select
+                value={selectedVoice}
+                onChange={(e) => setSelectedVoice(e.target.value)}
+                className="border p-2 rounded"
+              >
+                {availableVoices.map((voice) => (
+                  <option key={voice.name} value={voice.name}>
+                    {voice.name} ({voice.lang})
+                  </option>
+                ))}
+              </select>
+
+              {/* 添加提示文字 */}
+              <span className="text-sm text-gray-600">
+                如果沒有講話，是Chrome 130版本的問題，目前建議選語舒。
+              </span>
+            </div>
+
+            {/* 佇列狀態和清除按鈕 */}
+            {speechQueue.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {isSpeaking ? "正在播放" : "等待播放"}
+                </span>
+                <button
+                  onClick={clearSpeechQueue}
+                  className="px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600"
+                >
+                  清除佇列 ({speechQueue.length})
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
