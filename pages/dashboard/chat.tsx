@@ -281,7 +281,8 @@ const Chat = () => {
 
               {/* 添加提示文字 */}
               <span className="text-sm text-gray-600">
-                如果沒有講話，是Chrome 130版本的問題，目前建議選語舒。
+                如果沒有講話，是Chrome 130版本的問題，目前建議選 Microsoft
+                Hanhan。
               </span>
             </div>
 
