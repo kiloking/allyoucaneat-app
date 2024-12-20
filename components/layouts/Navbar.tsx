@@ -43,6 +43,7 @@ export function Navbar() {
                               <Link
                                 href={subItem.href}
                                 className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-purple-50"
+                                target="_blank"
                               >
                                 <div className="text-sm font-medium leading-none">
                                   {subItem.name}

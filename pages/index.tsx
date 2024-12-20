@@ -104,6 +104,11 @@ export default function Home() {
                 description: "自動回應觀眾留言，增加互動性",
                 icon: "🤖",
               },
+              {
+                title: "歐付寶斗內條",
+                description: "結合歐付寶設定目標斗內目標",
+                icon: "🤖",
+              },
 
               {
                 title: "一鍵整合",

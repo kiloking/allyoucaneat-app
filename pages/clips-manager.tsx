@@ -34,9 +34,9 @@ export default function ClipsManager() {
   const [config, setConfig] = useState<ClipsConfig>({
     channelName: "",
     mode: "random",
-    timeRange: "all",
+    timeRange: "7d",
     maxLength: 60,
-    volume: 50,
+    volume: 60,
     showOverlay: true,
     showTimer: false,
     preferCurrentCategory: false,
@@ -339,11 +339,11 @@ export default function ClipsManager() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">所有時間</SelectItem>
                         <SelectItem value="7d">最近 7 天</SelectItem>
                         <SelectItem value="30d">最近 30 天</SelectItem>
                         <SelectItem value="6m">最近 6 個月</SelectItem>
-                        <SelectItem value="1y">最近��年</SelectItem>
+                        <SelectItem value="1y">最近1年</SelectItem>
+                        <SelectItem value="all">所有時間</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
