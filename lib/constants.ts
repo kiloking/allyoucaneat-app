@@ -3,6 +3,7 @@ interface Feature {
   href: string;
   description: string;
   icon: string;
+  image: string;
 }
 
 export const navigation = [
@@ -19,12 +20,14 @@ export const navigation = [
         href: "/clips-manager",
         description: "隨選剪輯嵌入OBS並自動播放，提升頻道曝光",
         icon: "🎬",
+        image: "https://web.forestdev.work/sideproject1/cat02.png",
       },
       {
         name: "聊天室語音朗讀",
         href: "/chat",
         description: "自動將觀眾留言轉為語音，不錯過任何互動",
         icon: "🎯",
+        image: "https://web.forestdev.work/sideproject1/cat04.png",
       },
       // 可以在這裡添加更多功能選項
     ],

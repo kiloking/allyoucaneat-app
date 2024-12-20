@@ -78,13 +78,24 @@ export default function Home() {
           <h2 className="text-3xl font-bold text-center mb-16">已上線功能</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {onlineFeatures.map((item, index) => (
-              <div key={index} className="bg-white p-6 rounded-lg shadow-md">
-                <div className="text-4xl mb-4">{item.icon}</div>
+              <div
+                key={index}
+                className="bg-white p-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-300"
+              >
+                <div className="text-4xl mb-4">
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    width={600}
+                    height={100}
+                    className="rounded-lg shadow-xl w-full"
+                  />
+                </div>
                 <h3 className="text-xl font-semibold mb-2">{item.name}</h3>
                 <p className="text-gray-600">{item.description}</p>
                 <Link
                   href={item.href}
-                  className="text-zinc-800 border border-zinc-800 rounded-md px-4 py-2 mt-4 w-full flex justify-center items-center"
+                  className="text-zinc-800/80 border border-zinc-800/50 rounded-md px-4 py-2 mt-4 w-full flex justify-center items-center hover:border-zinc-900 transition-colors duration-300 hover:bg-gradient-to-r from-purple-400/20  to-blue-400/20 shadow-md "
                   target="_blank"
                 >
                   前往頁面{" "}
