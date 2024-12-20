@@ -82,6 +82,13 @@ export default function Home() {
                 <div className="text-4xl mb-4">{item.icon}</div>
                 <h3 className="text-xl font-semibold mb-2">{item.name}</h3>
                 <p className="text-gray-600">{item.description}</p>
+                <Link
+                  href={item.href}
+                  className="text-zinc-800 border border-zinc-800 rounded-md px-4 py-2 mt-4 w-full flex justify-center items-center"
+                  target="_blank"
+                >
+                  前往頁面{" "}
+                </Link>
               </div>
             ))}
           </div>
