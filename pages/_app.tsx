@@ -65,6 +65,11 @@ function App({ Component, pageProps }: AppProps) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/earlyaccess/cwtexyen.css"
         />
+        <title>圖奇喵直播助理</title>
+        <meta
+          name="description"
+          content="Twitch 實況主的最佳助手，提供多樣化的 Widgets 可以幫助您提升觀眾互動體驗"
+        />
       </Head>
       <SessionProvider session={pageProps.session}>
         <ThemeProvider
