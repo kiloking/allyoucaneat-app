@@ -46,19 +46,19 @@ export function getMenuList(pathname: string): Group[] {
       menus: [
         {
           href: "",
-          label: "Posts",
+          label: "實況管理",
           active: pathname.includes("/posts"),
           icon: SquarePen,
           submenus: [
             {
-              href: "/posts",
-              label: "All Posts",
-              active: pathname === "/posts",
+              href: "/board/clips",
+              label: "所有剪輯",
+              active: pathname === "/board/clips",
             },
             {
-              href: "/posts/new",
-              label: "New Post",
-              active: pathname === "/posts/new",
+              href: "/board/clips-manager",
+              label: "剪輯管理",
+              active: pathname === "/board/clips-manager",
             },
           ],
         },

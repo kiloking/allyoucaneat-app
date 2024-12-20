@@ -84,7 +84,7 @@ export function UserNav() {
           className="hover:cursor-pointer"
           onClick={() =>
             signOut({
-              callbackUrl: "/auth/login", // 登出後重定向到 /auth/login
+              callbackUrl: "/", // 登出後重定向到 /
             })
           }
         >

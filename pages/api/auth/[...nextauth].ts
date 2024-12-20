@@ -12,7 +12,8 @@ export const authOptions: AuthOptions = {
       clientSecret: process.env.NEXT_PUBLIC_CLIENT_SECRET as string,
       authorization: {
         params: {
-          scope: "openid user:read:email user:read:follows",
+          scope:
+            "openid user:read:email user:read:follows channel:read:subscriptions channel:read:vips",
           claims: {
             id_token: {
               email: null,
