@@ -199,7 +199,7 @@ const Chat = () => {
         })
         .catch((err) => {
           console.error("連接失敗:", err);
-          alert("連接失敗，請檢查頻道���稱是否正確");
+          alert("連接失敗，請檢查頻道名稱是否正確");
         });
     } catch (err) {
       console.error("建立連接時發生錯誤:", err);

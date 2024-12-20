@@ -60,13 +60,21 @@ export default function Home() {
                 提供多樣化的 Widgets 可以幫助您提升觀眾互動體驗
               </p>
             </div>
-            <div className="lg:w-1/2 mt-10 lg:mt-0">
-              <Image
-                src="https://web.forestdev.work/sideproject1/cat01.png"
-                alt="Twitch Tools Preview"
+            <div className="lg:w-1/2 mt-10 lg:mt-0 relative group">
+              <video
+                src="https://web.forestdev.work/sideproject1/cat02.mp4"
+                poster="https://web.forestdev.work/sideproject1/cat01.png"
                 width={600}
                 height={400}
-                className="rounded-lg shadow-xl"
+                className="rounded-lg shadow-xl w-full"
+                loop
+                muted
+                playsInline
+                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseLeave={(e) => {
+                  e.currentTarget.pause();
+                  e.currentTarget.currentTime = 0;
+                }}
               />
             </div>
           </div>
