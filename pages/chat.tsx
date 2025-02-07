@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import tmi from "tmi.js";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 
 const Chat = () => {
-  const [channel, setChannel] = useState("");
+  const [channel, setChannel] = useState(
+    localStorage.getItem("twitchChannel") || ""
+  );
   const [isConnected, setIsConnected] = useState(false);
   const [client, setClient] = useState<tmi.Client | null>(null);
   const [messages, setMessages] = useState<JSX.Element[]>([]);
@@ -146,6 +155,7 @@ const Chat = () => {
   // 連接到聊天室
   const connectToChat = (channelName: string) => {
     if (isConnected || !channelName.trim()) return;
+    localStorage.setItem("twitchChannel", channelName.trim());
 
     try {
       const newClient = new tmi.Client({
@@ -236,7 +246,7 @@ const Chat = () => {
             type="text"
             value={channel}
             onChange={(e) => setChannel(e.target.value)}
-            placeholder="輸入 Twitch 頻道名稱"
+            placeholder="e.g. dada6621"
             className="border p-2 rounded text-base"
             disabled={isConnected}
           />
@@ -259,6 +269,29 @@ const Chat = () => {
           {isConnected && (
             <span className="text-green-600 ml-2">✓ 已連接到 {channel}</span>
           )}
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <HelpCircle className="h-5 w-5 text-gray-500" />
+              </TooltipTrigger>
+              <TooltipContent className="bg-gray-200 text-black">
+                <div className="flex flex-col gap-2">
+                  <div>
+                    1.輸入頻道名稱，再按下連接聊天室，聽到語音已連結聊天室表示成功。
+                  </div>
+                  <div>
+                    2.如果使用一段時間後語音終止了，請中斷連接，再按一次連接。
+                  </div>
+                  <div>3.如果還是不行，在進階設定切換別的聲音模型。</div>
+                  <div>
+                    4.此頁關閉後，語音會自動停止，如果需要繼續語音，請重新連接。
+                  </div>
+                  <div>5.瀏覽器會記錄頻道名稱，所以可以不用每次輸入。</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         <div className="p-2 bg-gray-100 rounded-lg  w-1/2">

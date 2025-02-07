@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? 
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  
+  // 關聯
+  accounts      Account[]
+  sessions      Session[]
+  opaySettings  OpaySettings?
+  donations     Donation[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+}
+
+model OpaySettings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  
+  // 基本設定
+  opayId          String   // 歐付寶斗內ID
+  merchantId      String    // 商店代號
+  hashKey         String    // HashKey
+  hashIV          String    // HashIV
+  enabled         Boolean   @default(false)
+  minAmount       Int       @default(10)
+  channelUrl      String    // 頻道網址
+  
+  // 通知設定
+  alertSound      String   // 通知音效 URL
+  alertImage      String   // 通知圖片 URL
+  alertDuration   Int       @default(5000) // 通知顯示時間（毫秒）
+  
+  // 圖片設定
+  imageWidth      Int       @default(0)
+  imageHeight     Int       @default(0)
+  
+  // 文字設定
+  textTemplate    String    @default("感謝 {name} 贊助的 {amount} 元")
+  textEffect      String    @default("無")
+  fixedFontSize   Int       @default(72)
+  variableFontSize Int      @default(72)
+  
+  // 音效設定
+  soundVolume     Int       @default(20)
+  ttsVolume       Int       @default(20)
+  messagesFontSize Int      @default(30)
+  
+  // 時間戳記
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Donation {
+  id            String    @id @default(cuid())
+  userId        String    // 接收捐款的用戶
+  user          User      @relation(fields: [userId], references: [id])
+  amount        Float
+  donorName     String?
+  message       String?
+  tradeNo       String    // 歐付寶交易編號
+  createdAt     DateTime  @default(now())
+} 

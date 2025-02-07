@@ -1,4 +1,3 @@
-// types/next-auth.d.ts
 import NextAuth from "next-auth";
 
 declare module "next-auth" {
@@ -28,7 +27,7 @@ declare module "next-auth" {
     sub: string;
     provider: string;
     type: string;
-    providerAccountId: number;
+    providerAccountId: string;
     picture: string;
     name: string;
     email: string;

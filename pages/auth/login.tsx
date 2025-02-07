@@ -1,36 +1,42 @@
 import React, { useEffect } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 
 const Login = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // 當使用者已登入時，重定向到 /dashboard
   useEffect(() => {
     if (status === "authenticated") {
-      router.push("/dashboard");
+      router.push("/board");
     }
   }, [status, router]);
 
-  if (status === "loading") {
-    return <div>Loading...</div>;
-  }
+  const handleTwitchLogin = async () => {
+    try {
+      await signIn("twitch", { callbackUrl: "/board" });
+    } catch (error) {
+      console.error("Login error:", error);
+    }
+  };
 
-  if (session) {
+  if (status === "loading") {
     return (
-      <>
-        Signed in as {session.user?.email} <br />
-        <button onClick={() => signOut()}>Sign out</button>
-      </>
+      <div className="flex items-center justify-center min-h-screen">
+        <div>Loading...</div>
+      </div>
     );
   }
 
   return (
-    <>
-      Not signed in <br />
-      <button onClick={() => signIn("twitch")}>Sign in with Twitch</button>
-    </>
+    <div className="flex items-center justify-center min-h-screen">
+      <button
+        onClick={handleTwitchLogin}
+        className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700"
+      >
+        使用 Twitch 登入
+      </button>
+    </div>
   );
 };
 

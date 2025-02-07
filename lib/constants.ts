@@ -4,6 +4,7 @@ interface Feature {
   description: string;
   icon: string;
   image: string;
+  category: string;
 }
 
 export const navigation = [
@@ -21,6 +22,7 @@ export const navigation = [
         description: "隨選剪輯嵌入OBS並自動播放，提升頻道曝光",
         icon: "🎬",
         image: "https://web.forestdev.work/sideproject1/cat02.png",
+        category: "剪輯",
       },
       {
         name: "聊天室語音朗讀",
@@ -28,9 +30,15 @@ export const navigation = [
         description: "自動將觀眾留言轉為語音，不錯過任何互動",
         icon: "🎯",
         image: "https://web.forestdev.work/sideproject1/cat04.png",
+        category: "聊天",
       },
       // 可以在這裡添加更多功能選項
     ],
+    active: false,
+  },
+  {
+    name: "更多功能",
+    href: "/board",
     active: false,
   },
   {

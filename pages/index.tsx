@@ -4,12 +4,30 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/router";
 import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
+import { useState } from "react";
 import { FLOATING_WORDS, navigation, onlineFeatures } from "@/lib/constants";
 const inter = Inter({ subsets: ["latin"] });
+
+// 獲取所有分類
+const categories = [
+  "全部",
+  ...Array.from(new Set(onlineFeatures.map((item) => item.category))),
+];
 
 export default function Home() {
   const router = useRouter();
   const { data: session } = useSession();
+  const [selectedCategory, setSelectedCategory] = useState("全部");
+
+  // 處理分類選擇
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+  };
+
+  // 過濾工具
+  const filteredFeatures = onlineFeatures.filter((item) =>
+    selectedCategory === "全部" ? true : item.category === selectedCategory
+  );
 
   const handleStart = async () => {
     if (!session) {
@@ -84,30 +102,109 @@ export default function Home() {
       <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-6">
           <h2 className="text-3xl font-bold text-center mb-16">已上線功能</h2>
+          {/* 工具分類標籤 */}
+          <div className="flex flex-wrap gap-2 mb-8 justify-center">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => handleCategorySelect(category)}
+                className={`px-4 py-2 rounded-full transition-colors ${
+                  selectedCategory === category
+                    ? "bg-purple-500 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          {/* 工具搜索框 */}
+          <div className="mb-8 max-w-md mx-auto">
+            <input
+              type="text"
+              placeholder="搜尋工具..."
+              className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {onlineFeatures.map((item, index) => (
+            {filteredFeatures.map((item, index) => (
               <div
                 key={index}
-                className="bg-white p-6 rounded-lg shadow-md hover:bg-gray-100 transition-colors duration-300"
+                className="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group relative overflow-hidden border border-gray-100"
               >
-                <div className="text-4xl mb-4">
+                {/* 工具標籤 */}
+                <div className="absolute top-4 right-4 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                  {item.category || "通用"}
+                </div>
+
+                {/* 工具圖片 */}
+                <div className="relative overflow-hidden rounded-lg mb-4">
                   <Image
                     src={item.image}
                     alt={item.name}
                     width={600}
-                    height={100}
-                    className="rounded-lg shadow-xl w-full"
+                    height={400}
+                    className="w-full h-48 object-cover rounded-lg transform group-hover:scale-110 transition-transform duration-300"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
                 </div>
-                <h3 className="text-xl font-semibold mb-2">{item.name}</h3>
-                <p className="text-gray-600">{item.description}</p>
-                <Link
-                  href={item.href}
-                  className="text-zinc-800/80 border border-zinc-800/50 rounded-md px-4 py-2 mt-4 w-full flex justify-center items-center hover:border-zinc-900 transition-colors duration-300 hover:bg-gradient-to-r from-purple-400/20  to-blue-400/20 shadow-md "
-                  target="_blank"
-                >
-                  前往頁面{" "}
-                </Link>
+
+                {/* 工具內容 */}
+                <div className="space-y-4">
+                  <h3 className="text-2xl font-bold text-gray-800">
+                    {item.name}
+                  </h3>
+                  <p className="text-gray-600 min-h-[60px]">
+                    {item.description}
+                  </p>
+
+                  {/* 使用統計 */}
+                  <div className="flex items-center text-sm text-gray-500">
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                    <span>1234 次使用</span>
+                  </div>
+
+                  {/* 使用按鈕 */}
+                  <Link
+                    href={item.href}
+                    className="inline-flex items-center justify-center w-full px-6 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 transition-all duration-300 shadow-md hover:shadow-lg"
+                    target="_blank"
+                  >
+                    立即使用
+                    <svg
+                      className="ml-2 -mr-1 h-4 w-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

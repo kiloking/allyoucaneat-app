@@ -18,7 +18,13 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
 interface ClipsConfig {
   channelName: string;
   mode: "random" | "top";
@@ -281,11 +287,30 @@ export default function ClipsManager() {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto space-y-8">
             <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold text-gray-900">
-                Clips 播放器設定
-              </h1>
+              <div className="flex items-center justify-center gap-2">
+                <h1 className="text-4xl font-bold text-gray-900">
+                  Clips 播放器設定
+                </h1>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="h-5 w-5 text-gray-500" />
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-gray-200 text-black">
+                      <div className="flex flex-col gap-2 items-start">
+                        <div>1.輸入頻道名稱。</div>
+                        <div>2.調整播放設定。</div>
+                        <div>3.按下生成Widget網址，複製網址</div>
+                        <div>4.打開 OBS，新增瀏覽器，貼上 Widget 網址。</div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
               <p className="text-gray-600">
-                輸入您的 Twitch 頻道名稱，自訂播放設定，獲取可用於 OBS 的網址
+                適用於輪播 BRB 剪輯片段，輸入您的 Twitch 頻道名稱，獲取可用於
+                OBS 的網址。
               </p>
             </div>
 
@@ -296,7 +321,7 @@ export default function ClipsManager() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">頻道名稱</label>
                   <Input
-                    placeholder="輸入 Twitch 頻道名稱"
+                    placeholder="e.g. dada6621"
                     value={config.channelName}
                     onChange={(e) =>
                       setConfig({ ...config, channelName: e.target.value })

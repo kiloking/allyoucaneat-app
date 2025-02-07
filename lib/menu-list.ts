@@ -63,16 +63,22 @@ export function getMenuList(pathname: string): Group[] {
           ],
         },
         {
-          href: "/categories",
-          label: "Categories",
+          href: "",
+          label: "歐付寶斗內區",
           active: pathname.includes("/categories"),
           icon: Bookmark,
-          submenus: [],
+          submenus: [
+            {
+              href: "/board/settings/opay",
+              label: "OPay",
+              active: pathname === "/board/settings/opay",
+            },
+          ],
         },
         {
-          href: "/tags",
-          label: "Tags",
-          active: pathname.includes("/tags"),
+          href: "/settings/opay",
+          label: "歐付寶設定",
+          active: pathname.includes("/settings/opay"),
           icon: Tag,
           submenus: [],
         },

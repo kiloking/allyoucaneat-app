@@ -33,7 +33,7 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
 //     return next({ ctx });
 //   });
 
-// export const authedProcedure = t.procedure.use(isAuthed);
+export const authedProcedure = t.procedure.use(isAuthed);
 // export const adminProcedure = authedProcedure.use(hasRole(["ADMIN"]));
 // export const managerProcedure = authedProcedure.use(
 //   hasRole(["ADMIN", "MANAGER"])
