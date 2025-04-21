@@ -77,7 +77,7 @@ export function Navbar() {
 
             <div className="flex items-center space-x-2">
               <div className="px-2 space-y-1 text-sm text-gray-500">
-                歡迎使用，現在都還是測試階段喔。
+                歡迎使用，現在是測試階段，一切功能免費喔。
               </div>
             </div>
           </div>
