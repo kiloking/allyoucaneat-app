@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   Tooltip,
@@ -42,6 +43,27 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "other", label: "一般連結" },
 ];
 
+type AutoPlaySettings = { music: boolean; video: boolean };
+
+const DEFAULT_AUTO_PLAY: AutoPlaySettings = { music: true, video: true };
+const autoPlayStorageKey = (channel: string) =>
+  `song-request:${channel}:autoplay`;
+
+function loadAutoPlaySettings(channel: string): AutoPlaySettings {
+  if (typeof window === "undefined") return DEFAULT_AUTO_PLAY;
+  try {
+    const saved = localStorage.getItem(autoPlayStorageKey(channel));
+    if (!saved) return DEFAULT_AUTO_PLAY;
+    const parsed = JSON.parse(saved) as Partial<AutoPlaySettings>;
+    return {
+      music: parsed.music ?? true,
+      video: parsed.video ?? true,
+    };
+  } catch {
+    return DEFAULT_AUTO_PLAY;
+  }
+}
+
 export default function SongRequestRoom() {
   const router = useRouter();
   const channel =
@@ -56,7 +78,11 @@ export default function SongRequestRoom() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [playedIds, setPlayedIds] = useState<Set<string>>(new Set());
   const [theaterMode, setTheaterMode] = useState(false);
+  const [autoPlayMusic, setAutoPlayMusic] = useState(true);
+  const [autoPlayVideo, setAutoPlayVideo] = useState(true);
   const playerRef = useRef<HTMLIFrameElement | null>(null);
+  // 頁面載入時已存在的連結不觸發自動播放,只對之後新收集的生效
+  const seenLinkIdsRef = useRef<Set<string> | null>(null);
 
   // 可播放的佇列(音樂 + 影片,依收集順序)
   const queue = useMemo(
@@ -73,6 +99,49 @@ export default function SongRequestRoom() {
     setCurrentId(link.id);
     setPlayedIds((prev) => new Set(prev).add(link.id));
   }, []);
+
+  // 載入此頻道的自動播放偏好(預設皆開啟)
+  useEffect(() => {
+    if (!channel) return;
+    const settings = loadAutoPlaySettings(channel);
+    setAutoPlayMusic(settings.music);
+    setAutoPlayVideo(settings.video);
+    seenLinkIdsRef.current = null;
+  }, [channel]);
+
+  useEffect(() => {
+    if (!channel) return;
+    localStorage.setItem(
+      autoPlayStorageKey(channel),
+      JSON.stringify({ music: autoPlayMusic, video: autoPlayVideo })
+    );
+  }, [channel, autoPlayMusic, autoPlayVideo]);
+
+  const shouldAutoPlay = useCallback(
+    (link: CollectedLink) =>
+      (link.kind === "music" && autoPlayMusic) ||
+      (link.kind === "video" && autoPlayVideo),
+    [autoPlayMusic, autoPlayVideo]
+  );
+
+  // 新連結進佇列且播放器閒置時,依分類開關自動開始播放
+  useEffect(() => {
+    if (!channel || currentId) return;
+
+    if (seenLinkIdsRef.current === null) {
+      seenLinkIdsRef.current = new Set(links.map((link) => link.id));
+      return;
+    }
+
+    const newLinks = links.filter((link) => !seenLinkIdsRef.current!.has(link.id));
+    for (const link of newLinks) {
+      seenLinkIdsRef.current!.add(link.id);
+    }
+    if (newLinks.length === 0) return;
+
+    const toPlay = newLinks.find((link) => shouldAutoPlay(link));
+    if (toPlay) play(toPlay);
+  }, [links, currentId, channel, play, shouldAutoPlay]);
 
   const playNext = useCallback(() => {
     if (queue.length === 0) return;
@@ -226,9 +295,11 @@ export default function SongRequestRoom() {
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-neutral-500 gap-2">
                     <Play className="w-10 h-10" />
-                    <p className="text-sm">
+                    <p className="text-sm text-center px-4">
                       {queue.length > 0
-                        ? "從右側清單點選項目開始播放"
+                        ? autoPlayMusic || autoPlayVideo
+                          ? "等待新連結自動播放,或從右側清單手動點選"
+                          : "從右側清單點選項目開始播放"
                         : "等待觀眾在聊天室貼上連結..."}
                     </p>
                   </div>
@@ -273,6 +344,25 @@ export default function SongRequestRoom() {
                     </button>
                   ))}
                 </div>
+
+                {(activeTab === "music" || activeTab === "video") && (
+                  <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-800 bg-neutral-900/80">
+                    <span className="text-xs text-neutral-400">
+                      {activeTab === "music" ? "音樂" : "影片"}自動播放
+                    </span>
+                    <Switch
+                      checked={
+                        activeTab === "music" ? autoPlayMusic : autoPlayVideo
+                      }
+                      onCheckedChange={(checked) =>
+                        activeTab === "music"
+                          ? setAutoPlayMusic(checked)
+                          : setAutoPlayVideo(checked)
+                      }
+                      className="data-[state=checked]:bg-purple-600"
+                    />
+                  </div>
+                )}
 
                 <div className="overflow-y-auto flex-1 divide-y divide-neutral-800">
                   {tabLinks.length === 0 && (
