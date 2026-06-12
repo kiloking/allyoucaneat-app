@@ -39,7 +39,9 @@ export default async function handler(
     if (!tokenResponse.ok) {
       const error = await tokenResponse.json();
       console.error("Twitch API Error:", error);
-      throw new Error("Failed to get access token from Twitch");
+      const detail =
+        typeof error?.message === "string" ? error.message : "unknown error";
+      throw new Error(`Failed to get access token from Twitch: ${detail}`);
     }
 
     const data = await tokenResponse.json();

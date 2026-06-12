@@ -2,10 +2,11 @@ import Image from "next/image";
 import { Inter } from "next/font/google";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/router";
-import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FLOATING_WORDS, navigation, onlineFeatures } from "@/lib/constants";
+import { Input } from "@/components/ui/input";
+import { useChannelSettings } from "@/hooks/useChannelSettings";
 const inter = Inter({ subsets: ["latin"] });
 
 // 獲取所有分類
@@ -16,8 +17,9 @@ const categories = [
 
 export default function Home() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [selectedCategory, setSelectedCategory] = useState("全部");
+  const { channelName, setChannelName } = useChannelSettings();
+  const [channelInput, setChannelInput] = useState(channelName);
 
   // 處理分類選擇
   const handleCategorySelect = (category: string) => {
@@ -25,20 +27,19 @@ export default function Home() {
   };
 
   // 過濾工具
-  const filteredFeatures = onlineFeatures.filter((item) =>
-    selectedCategory === "全部" ? true : item.category === selectedCategory
+  const filteredFeatures = useMemo(
+    () =>
+      onlineFeatures.filter((item) =>
+        selectedCategory === "全部" ? true : item.category === selectedCategory
+      ),
+    [selectedCategory]
   );
 
   const handleStart = async () => {
-    if (!session) {
-      // 如果用戶未登入，先進行 Twitch 登入
-      await signIn("twitch", {
-        callbackUrl: "/board", // 登入成功後導向 /board
-      });
-    } else {
-      // 如果已登入，直接導向 /board
-      router.push("/board");
+    if (channelInput.trim()) {
+      setChannelName(channelInput.trim());
     }
+    router.push("/board");
   };
 
   return (
@@ -77,6 +78,25 @@ export default function Home() {
               <p className="text-xl">
                 提供多樣化的 Widgets 可以幫助您提升觀眾互動體驗
               </p>
+              <div className="bg-white/10 backdrop-blur rounded-xl p-4 space-y-3 max-w-lg">
+                <label className="text-sm font-medium tracking-wide">
+                  先輸入你的 Twitch 頻道名稱，所有工具將自動套用
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Input
+                    value={channelInput}
+                    onChange={(event) => setChannelInput(event.target.value)}
+                    placeholder="例如：dada6621"
+                    className="bg-white text-gray-900"
+                  />
+                  <Button onClick={handleStart} className="sm:w-auto">
+                    開始設定
+                  </Button>
+                </div>
+                <p className="text-sm text-white/70">
+                  我們會將頻道名稱保存於瀏覽器，無需登入也能快速使用。
+                </p>
+              </div>
             </div>
             <div className="lg:w-1/2 mt-10 lg:mt-0 relative group">
               <video

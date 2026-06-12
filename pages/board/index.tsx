@@ -1,85 +1,94 @@
 import { ContentLayout } from "@/components/admin-panel/content-layout";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { trpc } from "@/utils/trpc";
-
-interface TwitchChannelData {
-  total_followers: number;
-  broadcaster_name?: string;
-  game_name?: string;
-  title?: string;
-}
+import { useState, useEffect } from "react";
+import { useChannelSettings } from "@/hooks/useChannelSettings";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { MessageSquare } from "lucide-react";
+import Link from "next/link";
 
 export default function Dashboard() {
-  const [twitchChannelData, setTwitchChannelData] =
-    useState<TwitchChannelData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { data, isLoading } = trpc.twitch.getChannelFollowers.useQuery();
+  const { channelName, setChannelName } = useChannelSettings();
+  const [channelInput, setChannelInput] = useState(channelName);
 
   useEffect(() => {
-    if (data) {
-      setTwitchChannelData(data);
-      setLoading(false);
+    setChannelInput(channelName);
+  }, [channelName]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!channelInput.trim()) {
+      toast.error("請輸入頻道名稱");
+      return;
     }
-  }, [data]);
+    setChannelName(channelInput.trim());
+    toast.success("頻道名稱已儲存");
+  };
 
   return (
     <DashboardLayout>
       <ContentLayout title="Dashboard">
         <div className="space-y-6">
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <p className="text-yellow-700">
-              Tip1: 若要使用聊天室通知功能的主播請先到功能設定頁面
-              XXXbot開啟加入到聊天室
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <p className="text-blue-700 text-sm">
+              💡 提示：設定頻道名稱後，所有功能都會自動使用此頻道名稱。
             </p>
           </div>
 
-          {loading ? (
-            <div className="animate-pulse bg-white p-6 rounded-lg shadow">
-              <p>正在獲取頻道數據...</p>
-            </div>
-          ) : twitchChannelData ? (
-            <div className="bg-white p-6 rounded-lg shadow space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                頻道數據資訊
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-50 rounded-md">
-                  <p className="text-sm text-gray-500">追隨者數量</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {twitchChannelData.total_followers.toLocaleString()}
-                  </p>
-                </div>
-                {twitchChannelData.broadcaster_name && (
-                  <div className="p-4 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-500">實況主名稱</p>
-                    <p className="text-lg font-semibold">
-                      {twitchChannelData.broadcaster_name}
-                    </p>
-                  </div>
-                )}
-                {twitchChannelData.game_name && (
-                  <div className="p-4 bg-gray-50 rounded-md">
-                    <p className="text-sm text-gray-500">目前遊戲分類</p>
-                    <p className="text-lg font-semibold">
-                      {twitchChannelData.game_name}
-                    </p>
-                  </div>
-                )}
+          <div className="bg-white p-6 rounded-lg shadow space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900">頻道設定</h2>
+            <form className="space-y-3" onSubmit={handleSubmit}>
+              <label className="text-sm font-medium text-gray-700">
+                我的 Twitch 頻道名稱
+              </label>
+              <div className="flex flex-col md:flex-row gap-3">
+                <Input
+                  placeholder="例如：dada6621"
+                  value={channelInput}
+                  onChange={(event) => setChannelInput(event.target.value)}
+                  className="md:max-w-sm"
+                />
+                <Button type="submit" className="md:w-auto">
+                  儲存
+                </Button>
               </div>
-              {twitchChannelData.title && (
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">實況標題</p>
-                  <p className="text-lg">{twitchChannelData.title}</p>
+              <p className="text-sm text-gray-500">
+                頻道名稱會保存於瀏覽器本地，下次造訪可直接使用。
+              </p>
+            </form>
+            {channelName && (
+              <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
+                <p className="text-sm text-green-700">
+                  ✓ 目前設定：
+                  <span className="font-semibold">{channelName}</span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              可用功能
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link href="/board/chat">
+                <div className="p-4 border rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="h-8 w-8 text-purple-600" />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        聊天室語音朗讀
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        自動將觀眾留言轉為語音
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
+              </Link>
             </div>
-          ) : (
-            <div className="bg-red-50 border-l-4 border-red-400 p-4">
-              <p className="text-red-700">無法獲取頻道數據。</p>
-            </div>
-          )}
+          </div>
         </div>
       </ContentLayout>
     </DashboardLayout>

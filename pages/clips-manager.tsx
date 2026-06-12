@@ -1,10 +1,4 @@
-declare global {
-  interface Window {
-    Twitch?: any;
-  }
-}
-
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Head from "next/head";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,151 +18,29 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
-interface ClipsConfig {
-  channelName: string;
-  mode: "random" | "top";
-  timeRange: "all" | "7d" | "30d" | "6m" | "1y";
-  maxLength: number;
-  volume: number;
-  showOverlay: boolean;
-  showTimer: boolean;
-  preferCurrentCategory: boolean;
-}
+import { HelpCircle, Loader2 } from "lucide-react";
+import { useClipsForm } from "@/hooks/useClipsForm";
+import { useTwitchPlayer } from "@/hooks/useTwitchPlayer";
 
 export default function ClipsManager() {
-  const [config, setConfig] = useState<ClipsConfig>({
-    channelName: "",
-    mode: "random",
-    timeRange: "7d",
-    maxLength: 60,
-    volume: 60,
-    showOverlay: true,
-    showTimer: false,
-    preferCurrentCategory: false,
-  });
   const [widgetUrl, setWidgetUrl] = useState("");
-  const [previewClips, setPreviewClips] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const playerRef = useRef<any>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    let autoPlayTimer: NodeJS.Timeout;
-
-    if (isAutoPlaying && previewClips.length > 0) {
-      const currentClip = previewClips[currentPreviewIndex];
-      const duration = Math.ceil(currentClip.duration * 1000); // 轉換為毫秒
-      console.log("duration", duration);
-      autoPlayTimer = setTimeout(() => {
-        handleNextClip();
-      }, duration);
-    }
-
-    return () => {
-      if (autoPlayTimer) {
-        clearTimeout(autoPlayTimer);
-      }
-    };
-  }, [isAutoPlaying, currentPreviewIndex, previewClips]);
-
-  // 初始化 Twitch Player
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://player.twitch.tv/js/embed/v1.js";
-    script.async = true;
-
-    script.onload = () => {
-      if (previewClips.length > 0) {
-        initTwitchPlayer();
-      }
-    };
-
-    document.body.appendChild(script);
-
-    return () => {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
-  }, []);
-
-  // 當片段改變時重新初始化播放器
-  useEffect(() => {
-    if (window.Twitch && previewClips.length > 0) {
-      initTwitchPlayer();
-    }
-  }, [currentPreviewIndex, previewClips]);
-
-  const initTwitchPlayer = () => {
-    const clip = previewClips[currentPreviewIndex];
-    if (!clip) return;
-
-    const clipSlug = clip.url.split("/").pop();
-
-    if (playerRef.current) {
-      playerRef.current.destroy();
-    }
-
-    try {
-      const container = document.getElementById("twitch-player");
-      if (container) {
-        container.innerHTML = `
-          <iframe
-            src="https://clips.twitch.tv/embed?clip=${clipSlug}&parent=${window.location.hostname}&autoplay=true&muted=false"
-            width="100%"
-            height="100%"
-            allowfullscreen="true"
-            allow="autoplay"
-          ></iframe>
-        `;
-      }
-
-      const iframe = container?.querySelector("iframe");
-      if (iframe) {
-        iframe.onload = () => {
-          console.log("Clip loaded successfully");
-          // 嘗試設置音量
-          try {
-            const player = iframe as any;
-            if (player.setVolume) {
-              player.setVolume(config.volume / 100);
-            }
-          } catch (error) {
-            console.error("Error setting volume:", error);
-          }
-        };
-      }
-    } catch (error) {
-      console.error("Error initializing player:", error);
-
-      const container = document.getElementById("twitch-player");
-      if (container) {
-        container.innerHTML = `
-          <iframe
-            src="${clip.embed_url}&parent=${window.location.hostname}&autoplay=true&muted=false"
-            width="100%"
-            height="100%"
-            allowfullscreen="true"
-            allow="autoplay"
-          ></iframe>
-        `;
-      }
-    }
-  };
-
-  const handleNextClip = () => {
-    setCurrentPreviewIndex((prev) =>
-      prev < previewClips.length - 1 ? prev + 1 : 0
-    );
-  };
+  const { config, handleConfigChange } = useClipsForm();
+  const {
+    previewClips,
+    setPreviewClips,
+    currentPreviewIndex,
+    setCurrentPreviewIndex,
+    isAutoPlaying,
+    setIsAutoPlaying,
+    handleNextClip,
+  } = useTwitchPlayer(config.volume);
 
   const generateWidgetUrl = () => {
     if (!config.channelName) {
-      alert("請輸入頻道名稱");
+      toast.error("請輸入頻道名稱");
       return;
     }
 
@@ -187,91 +59,46 @@ export default function ClipsManager() {
       window.location.origin
     }/widgets/clipsplayer?${params.toString()}`;
     setWidgetUrl(url);
+    toast.success("Widget 網址已生成！");
   };
 
   const fetchPreviewClips = async () => {
     if (!config.channelName) {
-      alert("請輸入頻道名稱");
+      toast.error("請輸入頻道名稱");
       return;
     }
 
     setIsLoading(true);
+    setShowPreview(false);
+    setPreviewClips([]);
+
     try {
-      // 先獲取 App Access Token
-      const tokenResponse = await fetch("/api/twitch/app-token");
-      const { access_token } = await tokenResponse.json();
-
-      // 使用頻道名稱獲取用戶 ID
-      const userResponse = await fetch(
-        `https://api.twitch.tv/helix/users?login=${config.channelName}`,
-        {
-          headers: {
-            "Client-ID": process.env.NEXT_PUBLIC_CLIENT_ID!,
-            Authorization: `Bearer ${access_token}`,
-          },
-        }
-      );
-
-      const userData = await userResponse.json();
-      if (!userData.data?.[0]?.id) {
-        throw new Error("找不到該頻道");
-      }
-
-      // 根據設定獲取剪輯
-      let clipsUrl = `https://api.twitch.tv/helix/clips?broadcaster_id=${userData.data[0].id}&first=20`;
-
-      // 添加時間範圍過濾
-      if (config.timeRange !== "all") {
-        const startDate = new Date();
-        switch (config.timeRange) {
-          case "7d":
-            startDate.setDate(startDate.getDate() - 7);
-            break;
-          case "30d":
-            startDate.setDate(startDate.getDate() - 30);
-            break;
-          case "6m":
-            startDate.setMonth(startDate.getMonth() - 6);
-            break;
-          case "1y":
-            startDate.setFullYear(startDate.getFullYear() - 1);
-            break;
-        }
-        clipsUrl += `&started_at=${startDate.toISOString()}`;
-      }
-
-      const clipsResponse = await fetch(clipsUrl, {
-        headers: {
-          "Client-ID": process.env.NEXT_PUBLIC_CLIENT_ID!,
-          Authorization: `Bearer ${access_token}`,
-        },
+      const params = new URLSearchParams({
+        channel: config.channelName,
+        mode: config.mode,
+        range: config.timeRange,
+        length: config.maxLength.toString(),
       });
 
-      const clipsData = await clipsResponse.json();
+      const response = await fetch(`/api/twitch/clips?${params.toString()}`);
+      const clips = await response.json();
 
-      // 根據播放模式處理剪輯
-      let processedClips = clipsData.data;
-      if (config.mode === "top") {
-        // 按觀看次數排序
-        processedClips = processedClips.sort(
-          (a: any, b: any) => b.view_count - a.view_count
-        );
-      } else {
-        // 隨機排序
-        processedClips = processedClips.sort(() => Math.random() - 0.5);
+      if (!response.ok) {
+        throw new Error(clips.message || "獲取剪輯片段時發生錯誤");
       }
 
-      // 過長度超過設定的剪輯
-      processedClips = processedClips.filter(
-        (clip: any) => clip.duration <= config.maxLength
-      );
+      if (clips.length === 0) {
+        toast.info("找不到符合條件的剪輯片段");
+        return;
+      }
 
-      setPreviewClips(processedClips);
+      setPreviewClips(clips);
       setShowPreview(true);
       setCurrentPreviewIndex(0);
-    } catch (error) {
-      console.error("Error:", error);
-      alert("獲取剪輯片段時發生錯誤");
+      toast.success("成功獲取剪輯片段！");
+    } catch (error: any) {
+      console.error("Error fetching clips:", error);
+      toast.error(error.message || "獲取剪輯片段時發生錯誤");
     } finally {
       setIsLoading(false);
     }
@@ -324,7 +151,7 @@ export default function ClipsManager() {
                     placeholder="e.g. dada6621"
                     value={config.channelName}
                     onChange={(e) =>
-                      setConfig({ ...config, channelName: e.target.value })
+                      handleConfigChange("channelName", e.target.value)
                     }
                   />
                 </div>
@@ -339,7 +166,7 @@ export default function ClipsManager() {
                     <Select
                       value={config.mode}
                       onValueChange={(value: "random" | "top") =>
-                        setConfig({ ...config, mode: value })
+                        handleConfigChange("mode", value)
                       }
                     >
                       <SelectTrigger>
@@ -357,7 +184,7 @@ export default function ClipsManager() {
                     <Select
                       value={config.timeRange}
                       onValueChange={(value: any) =>
-                        setConfig({ ...config, timeRange: value })
+                        handleConfigChange("timeRange", value)
                       }
                     >
                       <SelectTrigger>
@@ -384,7 +211,7 @@ export default function ClipsManager() {
                     max={60}
                     step={5}
                     onValueChange={(value) =>
-                      setConfig({ ...config, maxLength: value[0] })
+                      handleConfigChange("maxLength", value[0])
                     }
                   />
                 </div>
@@ -398,7 +225,7 @@ export default function ClipsManager() {
                     min={0}
                     max={100}
                     onValueChange={(value) =>
-                      setConfig({ ...config, volume: value[0] })
+                      handleConfigChange("volume", value[0])
                     }
                   />
                 </div>
@@ -413,7 +240,7 @@ export default function ClipsManager() {
                     <Switch
                       checked={config.showOverlay}
                       onCheckedChange={(checked) =>
-                        setConfig({ ...config, showOverlay: checked })
+                        handleConfigChange("showOverlay", checked)
                       }
                     />
                   </div>
@@ -422,7 +249,7 @@ export default function ClipsManager() {
                     <Switch
                       checked={config.showTimer}
                       onCheckedChange={(checked) =>
-                        setConfig({ ...config, showTimer: checked })
+                        handleConfigChange("showTimer", checked)
                       }
                     />
                   </div>
@@ -437,7 +264,11 @@ export default function ClipsManager() {
                   size="lg"
                   disabled={isLoading}
                 >
-                  {isLoading ? "載入中..." : "預覽剪輯"}
+                  {isLoading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 載入中...</>
+                  ) : (
+                    "預覽剪輯"
+                  )}
                 </Button>
                 <Button
                   onClick={generateWidgetUrl}
@@ -454,16 +285,11 @@ export default function ClipsManager() {
                     <Input value={widgetUrl} readOnly />
                     <Button
                       onClick={() => {
-                        navigator.clipboard
-                          .writeText(widgetUrl)
-                          .then(() => {
-                            toast.success("已複製到剪貼簿");
-                          })
-                          .catch(() => {
-                            toast.error("複製失敗", {
-                              position: "bottom-right",
-                            });
-                          });
+                        navigator.clipboard.writeText(widgetUrl).then(() => {
+                          toast.success("已複製到剪貼簿");
+                        }).catch(() => {
+                          toast.error("複製失敗");
+                        });
                       }}
                     >
                       複製
@@ -473,6 +299,12 @@ export default function ClipsManager() {
               )}
 
               {/* 預覽區域 */}
+              {isLoading && (
+                <div className="flex justify-center items-center aspect-video w-full">
+                  <Loader2 className="h-16 w-16 text-purple-600 animate-spin" />
+                </div>
+              )}
+
               {showPreview && previewClips.length > 0 && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">預覽剪輯</h2>
@@ -483,7 +315,7 @@ export default function ClipsManager() {
                     />
                   </div>
 
-                  {/* 控制區域保持不變 */}
+                  {/* 控制區域 */}
                   <div className="flex justify-between items-center">
                     <div className="flex items-center space-x-4">
                       <Button
@@ -508,9 +340,7 @@ export default function ClipsManager() {
                       <Button
                         onClick={() => setIsAutoPlaying(!isAutoPlaying)}
                         variant={isAutoPlaying ? "default" : "outline"}
-                        className={
-                          isAutoPlaying ? "bg-purple-600 text-white" : ""
-                        }
+                        className={isAutoPlaying ? "bg-purple-600 text-white" : ""}
                       >
                         {isAutoPlaying ? "停止自動播放" : "自動播放"}
                       </Button>
@@ -524,9 +354,7 @@ export default function ClipsManager() {
                     </h3>
                     <p className="text-sm text-gray-500 mt-2">
                       觀看次數：
-                      {previewClips[
-                        currentPreviewIndex
-                      ].view_count.toLocaleString()}
+                      {previewClips[currentPreviewIndex].view_count.toLocaleString()}
                       <span className="mx-2">•</span>
                       建立者：{previewClips[currentPreviewIndex].creator_name}
                       <span className="mx-2">•</span>

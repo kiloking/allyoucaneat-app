@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, LogOut, User } from "lucide-react";
-import { signOut, useSession } from "next-auth/react";
+import { LayoutGrid, RefreshCcw, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,9 +20,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useChannelSettings } from "@/hooks/useChannelSettings";
 
 export function UserNav() {
-  const { data: session } = useSession();
+  const { channelName, clearChannelName } = useChannelSettings();
 
   return (
     <DropdownMenu>
@@ -36,13 +36,12 @@ export function UserNav() {
                 className="relative h-8 w-8 rounded-full"
               >
                 <Avatar className="h-8 w-8">
-                  {/* 使用者頭像，如果沒有頭像則顯示預設字母 */}
                   <AvatarImage
-                    src={session?.user?.image || ""}
-                    alt={session?.user?.name || "Avatar"}
+                    src="https://web.forestdev.work/sideproject1/cat04.png"
+                    alt="Streamer"
                   />
                   <AvatarFallback className="bg-transparent">
-                    {session?.user?.name ? session.user.name.charAt(0) : "JD"}
+                    {(channelName || "Streamer").charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -55,41 +54,36 @@ export function UserNav() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            {/* 顯示使用者名稱和郵件 */}
             <p className="text-sm font-medium leading-none">
-              {session?.user?.name || "John Doe"}
+              {channelName || "未設定頻道"}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {session?.user?.email || "johndoe@example.com"}
+              設定後可快速在各工具載入專屬資料
             </p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem className="hover:cursor-pointer" asChild>
-            <Link href="/dashboard" className="flex items-center">
+            <Link href="/board" className="flex items-center">
               <LayoutGrid className="w-4 h-4 mr-3 text-muted-foreground" />
-              Dashboard
+              控制台
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem className="hover:cursor-pointer" asChild>
-            <Link href="/account" className="flex items-center">
+            <Link href="/song-request" className="flex items-center">
               <User className="w-4 h-4 mr-3 text-muted-foreground" />
-              Account
+              觀眾點歌
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="hover:cursor-pointer"
-          onClick={() =>
-            signOut({
-              callbackUrl: "/", // 登出後重定向到 /
-            })
-          }
+          onClick={() => clearChannelName()}
         >
-          <LogOut className="w-4 h-4 mr-3 text-muted-foreground" />
-          登出
+          <RefreshCcw className="w-4 h-4 mr-3 text-muted-foreground" />
+          清除頻道設定
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

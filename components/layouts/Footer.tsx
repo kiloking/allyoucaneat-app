@@ -7,32 +7,25 @@ const Footer = () => {
   useEffect(() => {
     const checkStreamStatus = async () => {
       try {
-        const tokenResponse = await fetch("/api/twitch/app-token");
-        const { access_token } = await tokenResponse.json();
-        const clientId = process.env.NEXT_PUBLIC_CLIENT_ID!;
-
-        if (!clientId) {
-          throw new Error("Missing Twitch API credentials");
-        }
-
         const response = await fetch(
-          `https://api.twitch.tv/helix/streams?user_login=${channelName}`,
-          {
-            headers: {
-              "Client-ID": clientId,
-              Authorization: `Bearer ${access_token}`,
-            },
-          }
+          `/api/twitch/stream-status?login=${encodeURIComponent(channelName)}`
         );
+        const data = await response.json();
 
         if (!response.ok) {
-          throw new Error("Twitch API request failed");
+          // 憑證失效等伺服器錯誤時靜默顯示 Offline,避免每次輪詢噴錯
+          if (process.env.NODE_ENV === "development") {
+            console.warn("直播狀態查詢失敗:", data.message ?? response.status);
+          }
+          setIsLive(false);
+          return;
         }
 
-        const data = await response.json();
-        setIsLive(data.data.length > 0);
+        setIsLive(Boolean(data.isLive));
       } catch (error) {
-        console.error("檢查直播狀態時發生錯誤:", error);
+        if (process.env.NODE_ENV === "development") {
+          console.warn("檢查直播狀態時發生錯誤:", error);
+        }
         setIsLive(false);
       }
     };

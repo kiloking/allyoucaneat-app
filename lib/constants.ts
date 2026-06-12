@@ -26,11 +26,19 @@ export const navigation = [
       },
       {
         name: "聊天室語音朗讀",
-        href: "/chat",
+        href: "/board/chat",
         description: "自動將觀眾留言轉為語音，不錯過任何互動",
         icon: "🎯",
         image: "https://web.forestdev.work/sideproject1/cat04.png",
         category: "聊天",
+      },
+      {
+        name: "觀眾點歌",
+        href: "/song-request",
+        description: "自動收集聊天室連結，和觀眾一起聽歌看片",
+        icon: "🎵",
+        image: "https://web.forestdev.work/sideproject1/cat02.png",
+        category: "互動",
       },
       // 可以在這裡添加更多功能選項
     ],

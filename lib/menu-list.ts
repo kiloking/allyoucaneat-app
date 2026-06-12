@@ -1,10 +1,6 @@
 import {
-  Tag,
-  Users,
-  Settings,
-  Bookmark,
-  SquarePen,
   LayoutGrid,
+  MessageSquare,
   LucideIcon,
 } from "lucide-react";
 
@@ -33,72 +29,17 @@ export function getMenuList(pathname: string): Group[] {
       groupLabel: "",
       menus: [
         {
-          href: "/dashboard",
+          href: "/board",
           label: "首頁",
-          active: pathname.includes("/dashboard"),
+          active: pathname === "/board" || pathname === "/board/",
           icon: LayoutGrid,
           submenus: [],
         },
-      ],
-    },
-    {
-      groupLabel: "主播功能",
-      menus: [
         {
-          href: "",
-          label: "實況管理",
-          active: pathname.includes("/posts"),
-          icon: SquarePen,
-          submenus: [
-            {
-              href: "/board/clips",
-              label: "所有剪輯",
-              active: pathname === "/board/clips",
-            },
-            {
-              href: "/board/clips-manager",
-              label: "剪輯管理",
-              active: pathname === "/board/clips-manager",
-            },
-          ],
-        },
-        {
-          href: "",
-          label: "歐付寶斗內區",
-          active: pathname.includes("/categories"),
-          icon: Bookmark,
-          submenus: [
-            {
-              href: "/board/settings/opay",
-              label: "OPay",
-              active: pathname === "/board/settings/opay",
-            },
-          ],
-        },
-        {
-          href: "/settings/opay",
-          label: "歐付寶設定",
-          active: pathname.includes("/settings/opay"),
-          icon: Tag,
-          submenus: [],
-        },
-      ],
-    },
-    {
-      groupLabel: "設定",
-      menus: [
-        {
-          href: "/users",
-          label: "Users",
-          active: pathname.includes("/users"),
-          icon: Users,
-          submenus: [],
-        },
-        {
-          href: "/account",
-          label: "Account",
-          active: pathname.includes("/account"),
-          icon: Settings,
+          href: "/board/chat",
+          label: "聊天室語音朗讀",
+          active: pathname === "/board/chat",
+          icon: MessageSquare,
           submenus: [],
         },
       ],
